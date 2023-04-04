@@ -1,0 +1,144 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS 184 Rasterizer</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2023</h1>
+<h1 align="middle">Final Project Proposal: Constructing Meshes from a Set of Images</h1>
+<h2 align="middle">Eloy Ye, Esther Cai, Lillian Weng, Bryce Wong</h2>
+<br>
+
+<h2 align="middle">Summary</h2>
+<p>
+  For our final project, we plan on implementing two algorithms: one to convert multiple images of a real-life object into a point cloud, 
+  and another to derive a mesh from the point cloud. Achieving this goal would provide us a streamlined method for visualizing real-world objects graphically.
+</p>
+<br>
+
+<h2 align="middle">Problem Description</h2>
+<p>
+  The primary aim is to convert an object in the real world and represent it as a 3-D virtual object. In other words, creating a 3-D reconstruction of an object. 
+  It is an important field in imaging because it allows us to view an object with multiple angles as opposed to just being confined to the camera’s view. 
+  The General idea is that we would need a set of input images to extract the point cloud of the object by determining its world position and depth? Then converting 
+  the extracted point clouds to the mesh of the object.
+</p>
+<br>
+
+<h2 align="middle">Goals and Deliverables</h2>
+<p>
+  Given a set of images taken from different angles, we are aiming to:
+  <ol>
+    <li>
+      Take a video of an object at different angles and sample every ~8 frames to obtain a set of images, or obtaining a set of images representing this object from different angles
+      <ol type="a">
+        <li>For each image, infer the camera positions and angles using a black-box implementation (ie. COLMAP)</li>
+      </ol>
+    </li>
+    <br>
+
+    <li>
+      Feed these images and camera angles into NeRF, turning a continuous function that maps a 5D vector input (3D location x = (x, y, z) and 2D viewing direction (θ, φ)) 
+      to output of a RGB color value and volume density.To reconstruct the model, we could sample from the output values, and obtain a point cloud of our object.
+    </li>
+    <br>
+
+    <li>
+      Given the point cloud, attempt a few mesh reconstruction algorithms:
+      <ol type="a">
+        <li><a href="https://vgc.poly.edu/~csilva/papers/tvcg99.pdf">Ball-Pivot Algorithm</a></li>
+        <li><a href="https://hhoppe.com/poissonrecon.pdf?from=https://research.microsoft.com/en-us/um/people/hoppe/poissonrecon.pdf&type=path">Poisson Surface Reconstruction</a></li>
+        <li><a href="https://ieeexplore.ieee.org/document/1056714/">Alpha-shapes Algorithm</a> (if time permits)</li>
+      </ol>
+    </li>
+    <br>
+
+    <li>
+      Use classical volume rendering techniques to accumulate those colors and densities into a 2D image. We could make this optional under time constraints.
+    </li>
+    <br>
+
+    <li>
+      Alternatively, if the above extracting point cloud->mesh methods are too difficult to implement, another way of visualizing the resultant 3D model could be 
+      using volume rendering, which takes in the continuous function returned by NerF,  cast a camera ray vector r from the current pixel, with the expected color 
+      C(r) of camera ray r(t) = o + td with near and far bounds tn and tf:
+      
+      <div align="middle">
+        <br>
+        <img src="./image1.png" align="middle" width="600px" />
+      </div>
+      
+    </li>
+    <br>
+
+    <li>
+      (If we have time) color the mesh using one of the following algorithms:
+      <ol type="a">
+        <li>Barycentric Interpolation</li>
+        <li>Triangle Projection</li>
+        <li>Vertex projection</li>
+      </ol>
+    </li>
+  </ol>
+</p>
+<br>
+
+<h2 align="middle">Schedule</h2>
+<p>
+  Week 2 (April 10-16):
+  <ul>
+    <li><u>April 11, 2023: Project 4 Due</u> -> start working afterwards; wait for feedback</li>
+    <li>Take videos, feed through COLMAP</li>
+  </ul>
+
+  Week 3 (April 17-23):
+  <ul>
+    <li><u>Midterm 2 at April 20, 2023 (Thursday)</u></li>
+    <li>Write code to generate point cloud</li>
+  </ul>
+
+  Week 4 (April 24-30):
+  <ul>
+    <li><u>April 25, 2023: MILESTONE DUE</u></li>
+    <li>Write code to turn point cloud into mesh using the listed algorithm</li>
+  </ul>
+
+  Week 5 (April 31-May 5)
+  <ul>
+    <li><u>May 5, 2023: FINAL DELIVERABLES DUE</u></li>
+    <li>Finish work from Week 4 and (if we have time) code color mesh algorithms</li>
+    <li>Consolidate results into a final project video and website</li>
+  </ul>
+</p>
+<br>
+
+<h2 align="middle">Resources</h2>
+<li><a href="https://drive.google.com/drive/u/0/folders/12S0Zbx1npCttyBGMi4XOd72aVkoPz51U">https://drive.google.com/drive/u/0/folders/12S0Zbx1npCttyBGMi4XOd72aVkoPz51U</a></li>
+<li><a href="https://arxiv.org/pdf/2003.08934.pdf">https://arxiv.org/pdf/2003.08934.pdf</a></li>
+<li><a href="https://arxiv.org/pdf/2003.08934.pdf">NeRF</a></li>
+<li><a href="https://demuc.de/colmap/">COLMAP</a></li>
+<li><a href="https://vgc.poly.edu/~csilva/papers/tvcg99.pdf">Ball-pivot algorithm</a></li>
+<li><a href="https://hhoppe.com/poissonrecon.pdf?from=https://research.microsoft.com/en-us/um/people/hoppe/poissonrecon.pdf&type=path">Poisson surface reconstruction</a></li>
+<li><a href="https://ieeexplore.ieee.org/document/1056714/">Alpha-shapes algorithm </a></li>
+<li><a href="https://dl.acm.org/doi/10.1145/964965.808594">Volume rendering</a></li>
+
+</body>
+</html>
