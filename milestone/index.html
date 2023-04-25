@@ -1,31 +1,172 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-<head>
-<style>
-  body {
-    padding: 100px;
-    width: 1000px;
-    margin: auto;
-    text-align: left;
-    font-weight: 300;
-    font-family: 'Open Sans', sans-serif;
-    color: #121212;
-  }
-  h1, h2, h3, h4 {
-    font-family: 'Source Sans Pro', sans-serif;
-  }
-</style>
-<title>CS 184 Final Project Milestone</title>
-<meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link href="TODO" rel="stylesheet">
-</head>
+  <head>
+    <style>
+      body {
+        padding: 100px;
+        width: 1000px;
+        margin: auto;
+        text-align: left;
+        font-weight: 300;
+        font-family: "Open Sans", sans-serif;
+        color: #121212;
+      }
+      h1,
+      h2,
+      h3,
+      h4 {
+        font-family: "Source Sans Pro", sans-serif;
+      }
+    </style>
+    <title>CS 184 Final Project Milestone</title>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <link href="TODO" rel="stylesheet" />
+  </head>
 
-<body>
+  <body>
+    <h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2023</h1>
+    <h1 align="middle">
+      Final Project Milestone: Point Cloud to Mesh Reconstruction
+    </h1>
+    <h2 align="middle">Eloy Ye, Esther Cai, Lillian Weng, Bryce Wong</h2>
+    <br>
 
-<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2023</h1>
-<h1 align="middle">Final Project Proposal: Constructing Meshes from a Set of Images</h1>
-<h2 align="middle">Eloy Ye, Esther Cai, Lillian Weng, Bryce Wong</h2>
-<br>
+    <h2 align="middle">Overview</h2>
+    <p>
+      Our goal with the final project is to convert point cloud data into a
+      triangle mesh using poisson surface reconstruction. We had several action
+      items listed on our project proposal, but we chose to prioritize the
+      poisson reconstruction algorithm first.
+    </p>
+    <br>
 
-</body>
+    <h2 align="middle">Current Progress</h2>
+    <p>
+      We obtained our skeleton framework from code provided by the University of
+      Toronto (linked
+      <a
+        href="https://github.com/alecjacobson/geometry-processing-mesh-reconstruction"
+        >here</a
+      >) and used that as a starting point for our project.
+    </p>
+    <p>First, we implemented the following helper functions:</p>
+    <ul>
+      <li>
+        Encode trilinear interpolation calculation into a matrix, <b>W</b> with
+        `fd_interpolate`
+      </li>
+      <li>
+        Calculate the derivative at each point and store it in a matrix,
+        <b>G</b> through `fd_partial_derivative` and `fd_grad`
+      </li>
+    </ul>
+    <p>
+      After, we utilized these helper functions to define the poisson
+      reconstruction algorithm:
+    </p>
+    <ul>
+      <li>
+        First, we encode the trilinear interpolation calculation for partial
+        derivatives ∂g/∂x, ∂g/∂y, ∂g/∂z into matrices <b>W<sub>x</sub></b
+        >, <b>W<sub>y</sub></b
+        >, and <b>W<sub>z</sub></b>
+      </li>
+      <li>
+        Next, we obtain <b>v<sub>x</sub></b> =
+        <b>W<sub>x</sub> * N<sub>x</sub></b
+        >, where <b>N<sub>x</sub></b> is only the x-component from matrix
+        <b>N</b>. <b>N</b> encodes the normal vector information from the point
+        cloud data. Without loss of generality, we obtain
+        <b>v<sub>y</sub></b> and <b>v<sub>z</sub></b> with similar logic and
+        stack <b>v<sub>x</sub></b
+        >, <b>v<sub>y</sub></b
+        >, and <b>v<sub>z</sub></b> together to get <b>v</b>
+      </li>
+      <li>
+        We obtain <b>g</b> by solving:
+        <b>G<sup>T</sup>G @ g = G<sup>T</sup> @ v</b>, then determine the
+        iso-level sigma to extract from <b>g</b>
+      </li>
+      <li>
+        Finally, we feed this implicit function <b>g</b> to
+        `igl::copyleft::marching_cubes` to contour this function into a triangle
+        mesh V and F
+      </li>
+    </ul>
+    <br>
+
+    <h2 align="middle">Some Results</h2>
+    <h4>Visualizations of current point cloud representations:</h4>
+    <div align="middle">
+      <table style="width: 100%">
+        <tr align="center">
+          <td>
+            <img src="images/elephant.png" align="middle" width="400px" />
+            <br>
+            <figcaption>Elephant</figcaption>
+            <br>
+          </td>
+          <td>
+            <img src="images/hand.png" align="middle" width="400px" />
+            <br>
+            <figcaption>Hand</figcaption>
+            <br>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <p>
+      The white dots represent points from the point cloud, and the red arrows
+      represent the normals of each point.
+    </p>
+    <h4>Some code snippets from implemented algorithms:</h4>
+    <div align="middle">
+      <table style="width: 100%">
+        <tr align="center">
+          <td>
+            <img src="images/weights.png" align="middle" height="150px" />
+            <br>
+            <figcaption>
+              Interpolation weights in <b>W</b> for a specific voxel
+            </figcaption>
+            <br>
+          </td>
+          <td>
+            <img src="images/derivative.png" align="middle" height="150px" />
+            <br>
+            <figcaption>
+              Generating gradients in each direction for matrix <b>G</b>
+            </figcaption>
+            <br>
+          </td>
+        </tr>
+      </table>
+    </div>
+    <br>
+    <h2 align="middle">Reflection of our Initial Plan</h2>
+    <p>
+      So far, we have nearly accomplished the second half of our pipeline where
+      we constructed an object’s mesh from a given set of point clouds. So far,
+      we have yet to incorporate a NeRF model or any type of algorithm where you
+      have a set of images and produce a set of point clouds. We thought that
+      since we have nearly completed a simplified version of the Poisson
+      Reconstruction algorithm and therefore nearly done 50%, we could perhaps
+      either increase the complexity of our algorithm for optimization or extend
+      for more features as discussed below.
+    </p>
+    <br>
+    <h2 align="middle">Current Changes and Future Plans</h2>
+    <p>
+      Currently, we have written the bulk of our code for trilinear
+      interpolation, deriving derivatives, and the poisson reconstruction
+      algorithm. We aim to debug our code and fully complete our algorithm to
+      generate the final mesh images. Next, we will compare the performance of
+      our implementation with other (already-implemented) algorithms such as
+      Ball-Pivot. If we have more time, we plan on utilizing NeRF technology to
+      convert images into their point cloud representations. Additionally, we
+      can also extend the Poisson Reconstruction algorithm to include adaptive
+      grid or track the confidence of input data and its effect on smoothing
+      values.
+    </p>
+  </body>
 </html>
