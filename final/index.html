@@ -18,45 +18,498 @@
         font-family: "Source Sans Pro", sans-serif;
       }
     </style>
-    <title>CS 184 Final Project Milestone</title>
+    <title>CS 184 Final Project</title>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <link href="TODO" rel="stylesheet" />
+
+    <script>
+      MathJax = {
+        tex: {
+          inlineMath: [
+            ["$", "$"],
+            ["\\(", "\\)"],
+          ],
+        },
+      };
+    </script>
+    <script
+      id="MathJax-script"
+      async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"
+    ></script>
   </head>
 
   <body>
     <h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2023</h1>
     <h1 align="middle">
-      Final Project: Improving Instant-NGP’s Mesh Reconstruction with Point Clouds and Poisson Reconstruction
+      Final Project: Improving Instant-NGP’s Mesh Reconstruction with Point
+      Clouds and Poisson Reconstruction
     </h1>
-    <h2 align="middle">Eloy Ye, Esther Cai, Lillian Weng, Bryce Wong</h2>
+    <h2 align="middle">Esther Cai, Eloy Ye, Lillian Weng, Bryce Wong</h2>
     <br />
 
     <h2 align="middle">Abstract</h2>
-    <p>filler</p>
+    <p>
+      Since its invention in 2020, Neural Radiance Fields (NeRF) has become
+      widely popular in the field of deep learning and computer vision, and it
+      has inspired many papers. Particularly, a team at NVIDIA Research
+      significantly reduced the training cost of the NeRF neural network with
+      their project, Instant Neural Graphics Primitives, or Instant NGP for
+      short. While their paper delivers in speed and accuracy, the 3D meshes
+      generated from their trained model can be noisy. This project aims to
+      improve on Instant NGP’s mesh reconstruction by generating a point cloud
+      of an object from a trained model, cleaning the point cloud with a custom
+      GUI, and feeding the result into a custom pipeline. The pipeline first
+      calculates point cloud normals using PCA(Principal Component
+      Analysis)-based normal estimation then uses the Poisson Surface
+      Reconstruction Algorithm to transform it into a 3D mesh.
+    </p>
     <br />
+    <table style="width: 100%">
+      <tr align="center">
+        <td>
+          <img
+            src="images/bread_intro.png"
+            align="middle"
+            height="250px"
+            style="margin-bottom: 10px"
+          />
+          <br />
+          <figcaption>Input Image (Bread Plushie)</figcaption>
+          <br />
+        </td>
+        <td>
+          <img
+            src="images/mesh_intro.png"
+            align="middle"
+            height="250px"
+            style="margin-bottom: 10px"
+          />
+          <br />
+          <figcaption>Output Mesh with Instant NGP</figcaption>
+          <br />
+        </td>
+      </tr>
+    </table>
 
     <h2 align="middle">Technical Approach</h2>
-    <h3>Subheader 1</h3>
-    <p>filler</p>
-    <h3>Subheader 2</h3>
-    <p>filler</p>
+    <h3>Training NeRFs through Instant NGP + Extracting Point Clouds</h3>
+    <p>
+      To train an object using Instant NGP, we closely followed the guidelines
+      (linked
+      <a
+        href="https://github.com/NVlabs/instant-ngp/blob/master/docs/nerf_dataset_tips.md"
+        >here</a
+      >) provided by the Instant NGP repository. We began by collecting
+      approximately 100 images of that object at different viewpoints. This was
+      done by capturing a ~1-minute video on an iPhone 11 at 30fps, moving the
+      camera around to capture different perspectives, and sampling at a rate of
+      2 frames per second. After manually inspecting the images to delete blurry
+      ones, we use COLMAP to extract the camera positions and angles for each
+      image. The resulting images and camera positions were then used to train
+      an Instant NGP model on an NVIDIA Tesla T4 through Google Colab. We used
+      20,000 training steps and kept all other hyperparameters as default. Each
+      model took around 20 minutes to train, and results were stored in an .ingp
+      binary file.
+    </p>
+    <p>
+      After, we used Instant NGP’s custom GUI to crop the scene so that the
+      bounding box only contained the object of interest. The GUI had a feature
+      to transform the object into a mesh, but it did not have a point cloud
+      option. To remedy this, we wrote code to extract the vertices from Instant
+      NGP’s mesh and exported it as a .ply file using Python’s plyfile package
+      (linked
+      <a href="https://github.com/NVlabs/instant-ngp/discussions/402">here</a>).
+    </p>
+    <br />
+    <table style="width: 100%">
+      <tr align="center">
+        <td>
+          <img
+            src="images/bread.gif"
+            align="middle"
+            height="350px"
+            style="margin-bottom: 10px"
+          />
+          <br />
+          <figcaption>Scene Capture</figcaption>
+          <br />
+        </td>
+        <td>
+          <img
+            src="images/nerf_mesh.png"
+            align="middle"
+            height="350px"
+            style="margin-bottom: 10px"
+          />
+          <figcaption>Corresponding NeRF Mesh with instant-ngp</figcaption>
+          <br />
+        </td>
+      </tr>
+    </table>
+
+    <h3>Estimating Point Cloud Surface Normals</h3>
+    <p>
+      Building a mesh requires the surface normal at each point. Since we can
+      only extract the point clouds vertices themselves, we decided to test
+      three methods to estimate the unoriented normals:
+    </p>
+    <ol>
+      <li>
+        <a href="https://arxiv.org/abs/1904.07172"
+          >Deep iterative graph neural network</a
+        >
+      </li>
+      <li>
+        <a
+          href="https://imagine.enpc.fr/~marletr/publi/SGP-2012-Boulch-Marlet.pdf"
+          >Randomized Hough Transformation</a
+        >
+      </li>
+      <li>
+        Open3D's
+        <a
+          href="https://www.researchgate.net/publication/270577019_Understanding_3D_shapes_being_in_motion"
+          >covariance analysis algorithm</a
+        >
+        (PCA)
+      </li>
+    </ol>
+    <p>
+      Each of these normal estimation algorithms output two possible normals
+      along the same axis as a result of not knowing the global structure.
+      Therefore, the orientation is adjusted by graph optimization of the
+      Riemannian Graph such that normals are consistent between pairs of tangent
+      planes (which combines both K-Nearest Neighbor and Minimum Spanning Tree
+      to provide approximate correct orientation). We used Open3D’s library in
+      Python for normal estimation and correcting orientation.
+    </p>
+    <br />
+    <table style="width: 100%">
+      <tr align="center">
+        <td>
+          <img
+            src="images/bread_normals.png"
+            align="middle"
+            height="300px"
+            style="margin-bottom: 10px"
+          />
+          <br />
+          <figcaption>Bread Point Cloud + Normals</figcaption>
+          <br />
+        </td>
+        <td>
+          <img
+            src="images/cup_normals.png"
+            align="middle"
+            height="300px"
+            style="margin-bottom: 10px"
+          />
+          <figcaption>Cup Point Cloud + Normals</figcaption>
+          <br />
+        </td>
+      </tr>
+    </table>
+
+    <h3>Cleaning Point Clouds</h3>
+    <p>
+      The results of our mesh reconstruction turns out to have higher quality if
+      we clean up the point cloud by removing some of the interior points inside
+      the surface for our pointcloud. Using a plugin from opengl::glfw library,
+      we built a custom UI allowing us to directly clean up the point cloud with
+      a spherical eraser before converting to mesh. We trace the position of the
+      mouse by projecting screen space coordinate to world space coordinate
+      where the point cloud lives in order to decide the position of the eraser.
+    </p>
+    <br />
+    <table style="width: 100%">
+      <tr align="center">
+        <td>
+          <img
+            src="images/ui_example.png"
+            align="middle"
+            height="300px"
+            style="margin-bottom: 10px"
+          />
+          <br />
+          <figcaption>Custom UI Display</figcaption>
+          <br />
+        </td>
+        <td>
+          <img
+            src="images/pc_extract.png"
+            align="middle"
+            height="300px"
+            style="margin-bottom: 10px"
+          />
+          <br />
+          <figcaption>Bottle Point Cloud (Instant NGP)</figcaption>
+          <br />
+        </td>
+        <td>
+          <img
+            src="images/pc_clean.png"
+            align="middle"
+            height="300px"
+            style="margin-bottom: 10px"
+          />
+          <figcaption>Bottle Point Cloud (Cleaned)</figcaption>
+          <br />
+        </td>
+      </tr>
+    </table>
+
+    <h3>Poisson Surface Reconstruction</h3>
+    <p>
+      We obtained our skeleton framework from the University of Toronto, linked
+      <a
+        href="https://github.com/alecjacobson/geometry-processing-mesh-reconstruction"
+        >here</a
+      >, and used that as a starting point to code the rest of the algorithm
+      from scratch. Given a point cloud and the surface normals of each point,
+      we represent the list of points as a matrix $P$ and the list of normals as
+      a matrix $N$. Additionally, we specify the components of our
+      finite-difference grid that the mesh is rendered within, defining the
+      number of nodes in each dimension ($nx$, $ny$, $nz$), the grid spacing
+      $h$, and the corner $c$ of the finite-difference grid.
+    </p>
+
+    <h4><u>fd_interpolate</u></h4>
+    <p>
+      First, we construct a sparse matrix $W$ that encodes trilinear
+      interpolation operations between each point and the corresponding voxel
+      (3D box) it lives in. In other words, given the grid nodes of the voxels
+      in a vector $x$, $P = W * x$.
+    </p>
+
+    <p>
+      Next, given a voxel $v$ and corresponding point $p$, we can define the
+      trilinear interpolation of $p$ from a series of linear interpolations:
+    </p>
+    <table style="width: 100%">
+      <tr align="center">
+        <td>
+          <img
+            src="images/trilinear.jpg"
+            align="middle"
+            height="250px"
+            style="margin-bottom: 10px"
+          />
+          <br />
+          <figcaption>
+            Trilinear Interpolation Calculation<br /><span style="color: white"
+              >.</span
+            >
+          </figcaption>
+          <br />
+        </td>
+        <td>
+          <img
+            src="images/lerp.jpg"
+            align="middle"
+            height="250px"
+            style="margin-bottom: 10px"
+          />
+          <br />
+          <figcaption>
+            Linear Interpolation Equation<br />$k$ represents the proportion of
+            $p$ relative to $a$ and $b$
+          </figcaption>
+          <br />
+        </td>
+      </tr>
+    </table>
+
+    <p>
+      When combining all the linear interpolation (lerp) operations for our
+      trilinear operation, we notice the following pattern:
+    </p>
+    <ul>
+      <li>
+        Given a certain direction $d$ for the linear interpolation (i.e. x, y, z
+        axis) and points $a$, $b$ to lerp across (where $a$ is before $b$), we
+        assign $a$ the coefficient $k_d$ and $b$ the coefficient ($1 - k_d$)
+        <ul>
+          <li>
+            Therefore, a point like $v_{010}$ would have a weight of $k_x * (1 -
+            k_y) * k_z$
+          </li>
+        </ul>
+      </li>
+    </ul>
+
+    <p>
+      Additionally, we encode each voxel position, $g(i, j, k)$, with the
+      following equation: $i + j * nx + k * nx * ny$. Therefore, for each point
+      $p$ in $P$, we first identify the voxel $p$ belongs to. After, for each
+      corner of the voxel, we set the value $w$ in the matrix $W$ at coordinates
+      $(i, g)$, where $i$ is the index of the current point we are evaluating,
+      $g$ is the encoding of the voxel ID, and $w$ is the corresponding
+      trilinear interpolation weight.
+    </p>
+    <br />
+
+    <h4><u>fd_partial_derivative</u></h4>
+    <p>
+      Next, we define a function to construct a sparse matrix $D$ that contains
+      the partial derivatives for a specified direction $dir$ over each point in
+      the finite-difference grid (i.e. we can define three matrices $D_x$,
+      $D_y$, $D_z$). Note that $D$ will encode partial derivatives on a
+      staggered grid that is shifted by 1/2 in the specified $dir$ direction.
+      Logically this makes sense: since we subtract the values of two points to
+      estimate their derivative, we are effectively calculating the derivative
+      in-between both points (i.e. half-way between each one).
+    </p>
+
+    <div align="middle">
+      <img
+        src="images/staggered.jpg"
+        align="middle"
+        height="250px"
+        style="margin-bottom: 10px"
+      />
+      <figcaption>Staggered Grid</figcaption>
+    </div>
+
+    <p>
+      Given the row $D_{i - \frac{1}{2}, j, k}$, we set its corresponding column
+      $c$ to:
+    </p>
+    <ul>
+      <li>$-1$ if $c = i - 1$</li>
+      <li>$1$ if $c = i$</li>
+      <li>$0$ otherwise</li>
+    </ul>
+    <p>
+      Additionally, we encode row $D_{i - \frac{1}{2}, j, k}$ as the value $d =
+      i + j * nx + k * nx * ny$ (this represents the row index in the matrix
+      $D$).
+    </p>
+    <br />
+
+    <h4><u>fd_grad</u></h4>
+    <p>
+      Finally, given our implementation of <b>fd_partial_derivative</b>, we can
+      create the sparse gradient matrix $G$ by concatenating the partial
+      derivative matrices $D_x$, $D_y$, $D_z$ top-to-bottom.
+    </p>
+    <br />
+
+    <h4><u>poisson_surface_reconstruction</u></h4>
+    <p>
+      In this function, we construct implicit function $g$ to feed into the
+      Marching Cubes Algorithm to generate a corresponding mesh.
+    </p>
+    <ol>
+      <li>
+        We first encode the positions of the normals to align with the
+        corresponding positions of our partial derivatives $∂g/∂x$, $∂g/∂y$,
+        $∂g/∂z$ that live on the staggered grid (using
+        <b>fd_partial_derivative</b>). Then, we obtain weight matrices, $W_x$,
+        $W_y$, $W_z$ from <b>fd_interpolate</b>, which are used to multiply with
+        each of the columns of the normal matrix $N$ to get the interpolated
+        value of normals.
+      </li>
+      <li>
+        Calculate $v_x = W_x*N_x$, where $N_x$ is the x-component from matrix
+        $N$. Without loss of generality, we can obtain $v_y$ and $v_z$ with a
+        similar calculation. Stack $v_x$, $v_y$, and $v_z$ vertically to get
+        $v$.
+      </li>
+      <li>
+        Now our goal is to then minimize the least square error of our normals
+        $v$ with the gradient of $g$. To do so, we estimate $∇g$ with $G*g$. Now
+        we solve using the least squares for $g$:
+        <ol>
+          <li>Optimize $min_g|\frac{1}{2}Gg-v|^2$</li>
+          <li>
+            Simplifying, we get $G^TGg = G^Tv$. Turns out this is the poisson
+            equation,$∇ \cdot ∇g =∇ \cdot V$, with $∇$ as $G^T$
+          </li>
+          <li>
+            Solve the poisson equation by solving the linear equation above to
+            get $g$.
+          </li>
+        </ol>
+      </li>
+      <li>
+        Then, we determine the iso-level sigma to extract from $g$, which is
+        calculated from $1^TW*g/n$. There are infinitely many solution of $g$,
+        since adding a constant sigma to $g$ would give the same $∇g$, we choose
+        the constant sigma to add back to $g$ so that the result looks better.
+      </li>
+      <li>
+        Finally, we input the constant implicit function $g$, staggered grid,
+        and vertices to the marching cubes algorithm to generate a mesh
+        containing vertices and faces.
+      </li>
+    </ol>
     <br />
 
     <h2 align="middle">Results</h2>
-    <h3 align="middle">Subheader:</h3>
+    <h3 align="middle">Bread Plushie</h3>
     <div align="middle">
       <table style="width: 100%">
         <tr align="center">
           <td>
-            <img src="images/blah.png" align="middle" width="400px" />
+            <img
+              src="images/bread_intro.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
             <br />
-            <figcaption>Image 1</figcaption>
+            <figcaption>Original Object</figcaption>
             <br />
           </td>
           <td>
-            <img src="images/blah.png" align="middle" width="400px" />
+            <img
+              src="images/mesh_intro.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
             <br />
-            <figcaption>Image 2</figcaption>
+            <figcaption>Instant NGP's Mesh</figcaption>
+            <br />
+          </td>
+        </tr>
+        <tr align="center">
+          <td>
+            <img
+              src="images/bread_pc.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Cleaned Point Cloud with Normals</figcaption>
+            <br />
+          </td>
+          <td>
+            <img
+              src="images/bread_mesh_unclean.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Mesh Before Cleaning Point Cloud</figcaption>
+            <br />
+          </td>
+        </tr>
+      </table>
+      <table>
+        <tr align="center">
+          <td>
+            <img
+              src="images/bread_mesh_clean.png"
+              align="middle"
+              height="350px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Mesh After Cleaning Point Cloud</figcaption>
             <br />
           </td>
         </tr>
@@ -64,26 +517,236 @@
     </div>
     <br />
 
+    <h3 align="middle">Bottle</h3>
+    <div align="middle">
+      <table style="width: 100%">
+        <tr align="center">
+          <td>
+            <img
+              src="images/bottle.jpeg"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Original Object</figcaption>
+            <br />
+          </td>
+          <td>
+            <img
+              src="images/bottle_ngp.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Instant NGP's Mesh</figcaption>
+            <br />
+          </td>
+        </tr>
+        <tr align="center">
+          <td>
+            <img
+              src="images/pc_extract.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Point Clouds + Normals (Uncleaned)</figcaption>
+            <br />
+          </td>
+          <td>
+            <img
+              src="images/bottle_mesh_unclean.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Final Poisson Mesh (Uncleaned)</figcaption>
+            <br />
+          </td>
+        </tr>
+        <tr align="center">
+          <td>
+            <img
+              src="images/pc_clean.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Point Clouds + Normals (Cleaned)</figcaption>
+            <br />
+          </td>
+          <td>
+            <img
+              src="images/bottle_mesh_clean.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Final Poisson Mesh (Cleaned)</figcaption>
+            <br />
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <h3 align="middle">Cup</h3>
+    <div align="middle">
+      <table style="width: 100%">
+        <tr align="center">
+          <td>
+            <img
+              src="images/cup.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Original Object</figcaption>
+            <br />
+          </td>
+          <td>
+            <img
+              src="images/cup_ngp.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Instant NGP's Mesh</figcaption>
+            <br />
+          </td>
+        </tr>
+        <tr align="center">
+          <td>
+            <img
+              src="images/cup_pc.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Point Clouds + Normals (Cleaned)</figcaption>
+            <br />
+          </td>
+          <td>
+            <img
+              src="images/cup_final.png"
+              align="middle"
+              height="300px"
+              style="margin-bottom: 10px"
+            />
+            <br />
+            <figcaption>Final Poisson Mesh (Cleaned)</figcaption>
+            <br />
+          </td>
+        </tr>
+      </table>
+    </div>
+
     <h2 align="middle">References</h2>
-    <ul>
-      <li><a href="#">Reference 1</a></li>
-      <li><a href="#">Reference 2</a></li>
-    </ul>
+    <ol>
+      <li>
+        <a href="https://www.matthewtancik.com/nerf">Neural Radiance Fields</a>
+      </li>
+      <li>
+        <a href="https://nvlabs.github.io/instant-ngp/"
+          >Instant Neural Graphics Primitives</a
+        >
+      </li>
+      <li><a href="https://demuc.de/colmap/">COLMAP</a></li>
+      <li>
+        <a
+          href="https://hhoppe.com/poissonrecon.pdf?from=https://research.microsoft.com/en-us/um/people/hoppe/poissonrecon.pdf&type=path"
+          >Poisson surface reconstruction</a
+        >
+      </li>
+      <li>
+        <a href="https://github.com/NVlabs/instant-ngp/discussions/402"
+          >Instant-ngp mesh to point cloud</a
+        >
+      </li>
+      <li>
+        <a
+          href="https://www.researchgate.net/publication/270577019_Understanding_3D_shapes_being_in_motion"
+          >Normal estimation: Understanding 3D Shapes in Motion</a
+        >
+      </li>
+      <li>
+        <a
+          href="http://www.open3d.org/docs/0.7.0/python_api/open3d.geometry.estimate_normals.html"
+          >Open3D Estimate Normals</a
+        >
+      </li>
+      <li>
+        <a href="https://hhoppe.com/recon.pdf"
+          >Consistent tangent plane orientation (hhoppe)</a
+        >
+      </li>
+      <li>
+        <a
+          href="http://www.open3d.org/docs/release/python_api/open3d.geometry.PointCloud.html"
+          >Consistent tangent plane orientation (Open3D)</a
+        >
+      </li>
+      <li>
+        <a
+          href="https://github.com/alecjacobson/geometry-processing-mesh-reconstruction"
+          >Poisson Surface Reconstruction skeleton code</a
+        >
+      </li>
+    </ol>
     <br />
 
     <h2 align="middle">Contributions from Each Team Member</h2>
+    <p>
+      All authors contributed towards brainstorming, designing, implementing,
+      and presenting this project.
+    </p>
     <ul>
-      <li>Eloy: _</li>
-      <li>Esther: _</li>
-      <li>Lillian: _</li>
-      <li>Bryce: _</li>
-    </ul>
+      <li>
+        Esther: Implemented one quarter of the poisson reconstruction algorithm.
+        Added the script that computes surface normal with the Open3D library.
+        Implemented custom UI to have the option to clean up point cloud and
+        export as a collada file. Cleaned up the point clouds and generated the
+        resulting mesh.
+      </li>
+      <li>
+        Eloy: Contributed to the outline of the project from extracing the point
+        cloud from NeRF to improve on mesh reconstruction and pipelining it to
+        poisson surface reconstruction. Additionally, deliviered images during
+        the first milestone and technical implementation on the slides. Slightly
+        debugged parts of the poisson reconstruction algorithm and pipelined
+        conversion of point clouds to include normals from the outputs of NeRF.
+      </li>
+      <li>
+        Lillian: Collected training data of objects -- taking videos and
+        sampling them for images -- and fed images through COLAB to obtain
+        camera positions. Used collected data to train Instant NGP’s NeRF model
+        on Google Colab and extracted point clouds from the trained model.
+        Co-implemented the 3 helper functions used by the poisson reconstruction
+        algorithm (<b>fd_{interpolate, partial_derivative, grad}</b>) with
+        Bryce.
+      </li>
+      <li>
+        Bryce: Co-implemented the 3 helper functions used by the poisson
+        reconstruction algorithm (<b
+          >fd_{interpolate, partial_derivative, grad}</b
+        >). Initially implemented a UI with Javascript to edit point clouds --
+        this idea was eventually scrapped and replaced with Esther's custom UI.
+        Generated project websites for each part of the project.
+      </li>
+    </ul><br />
 
     <h2 align="middle">Links to Presentation Slides and Milestone Video</h2>
     <ul>
-      <li><a href="#">Presentation Slides (TBD)</a></li>
-      <li><a href="#">Final Project Video (TBD)</a></li>
+      <li><a href="https://docs.google.com/presentation/d/1ol1l49PsZWw9JaAD6zx6TLJZaGxlxSGsYJ3uqm7nF9E/edit?usp=sharing">Presentation Slides</a></li>
+      <li><a href="https://drive.google.com/file/d/1n7i_PKMkR7o2kMtP5A6JEdugNY-pY0fm/view">Final Project Video</a></li>
     </ul>
-
   </body>
 </html>
